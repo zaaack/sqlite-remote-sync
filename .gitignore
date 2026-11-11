@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+*.tsbuildinfo
+
+# This project uses pnpm. Keep npm/yarn/bun lockfiles out.
+package-lock.json
+yarn.lock
+bun.lockb

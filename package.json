@@ -1,0 +1,82 @@
+{
+  "name": "sqlite-remote-sync",
+  "version": "0.1.0",
+  "description": "Bidirectional, conflict-free SQLite sync over WebDAV / HTTP object storage, for kysely-sqlite-tools, web, React Native, Capacitor, Electron, Tauri and Node.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.2",
+  "keywords": [
+    "sqlite",
+    "sync",
+    "webdav",
+    "kysely",
+    "crdt",
+    "offline-first",
+    "react-native",
+    "capacitor",
+    "tauri",
+    "electron",
+    "opfs"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./backends": {
+      "types": "./dist/remote/index.d.ts",
+      "import": "./dist/remote/index.js"
+    },
+    "./backends/fs": {
+      "types": "./dist/remote/fs.d.ts",
+      "import": "./dist/remote/fs.js"
+    },
+    "./backends/mirror": {
+      "types": "./dist/remote/mirror.d.ts",
+      "import": "./dist/remote/mirror.js"
+    },
+    "./backends/files-sdk": {
+      "types": "./dist/remote/files-sdk.d.ts",
+      "import": "./dist/remote/files-sdk.js"
+    },
+    "./kysely": {
+      "types": "./dist/kysely-plugin.d.ts",
+      "import": "./dist/kysely-plugin.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "test:e2e": "tsx --test test/webdav-e2e.test.ts",
+    "qa": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "preversion": "pnpm test"
+  },
+  "peerDependencies": {
+    "kysely": ">=0.29"
+  },
+  "peerDependenciesMeta": {
+    "kysely": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "kysely": "^0.29.0",
+    "kysely-generic-sqlite": "^2.0.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "webdav-server": "^2.6.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
