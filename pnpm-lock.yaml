@@ -202,21 +202,21 @@ importers:
 
   demo:
     dependencies:
+      '@subframe7536/sqlite-wasm':
+        specifier: 1.4.1
+        version: 1.4.1
       kysely:
         specifier: ^0.29.9
         version: 0.29.9
-      kysely-wasm:
-        specifier: ^2.0.1
-        version: 2.0.1(kysely@0.29.9)
+      kysely-wasqlite-worker:
+        specifier: 2.0.1
+        version: 2.0.1(@subframe7536/sqlite-wasm@1.4.1)(kysely@0.29.9)
       react:
         specifier: ^19.3.1
         version: 19.3.1
       react-dom:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
-      sql.js:
-        specifier: ^1.16.0
-        version: 1.16.0
       sqlite-remote-sync:
         specifier: workspace:*
         version: link:..
@@ -227,9 +227,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
-      '@types/sql.js':
-        specifier: ^1.4.11
-        version: 1.4.11
       '@vitejs/plugin-react':
         specifier: ^6.3.0
         version: 6.3.0(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15))
@@ -521,11 +518,11 @@ packages:
   '@rolldown/pluginutils@1.1.1':
     resolution: {integrity: sha512-glFIJDvLNDtJhT9qrMFWLPbvS+skxgt4L0K8Ei2YtnhPysAJnsI7nyxSJxKj4ADeKX0OLjC4ntRkwpLOoS3rwA==}
 
+  '@subframe7536/sqlite-wasm@1.4.1':
+    resolution: {integrity: sha512-Q6g5/U5V029LccnZrHyH7uGUYpfzLxD0QEg49fQC0ayu0pB+9nfeK3kaNDXXISkXvE1NYu7SBVwlfGd4JyiXuA==}
+
   '@tybys/wasm-util@0.10.4':
     resolution: {integrity: sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==}
-
-  '@types/emscripten@1.41.6':
-    resolution: {integrity: sha512-uN+9i8bFT5CUcZfyIEYDrSueACEyKGbUs5kC/72DGlZZoinh84sJfVV0i8UOJD1asdzkvLPBRrKs41kZ8MdEXg==}
 
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
@@ -537,9 +534,6 @@ packages:
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
-
-  '@types/sql.js@1.4.11':
-    resolution: {integrity: sha512-QXIx38p2ZThJaK9vP5ZdqdlRe1FG9I8SmCZOS7FHfB/2qPAjZwkL7/vlfPg6N/oWHuuOaGg/P/IRwfP2W0kWVQ==}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
@@ -708,9 +702,10 @@ packages:
     peerDependencies:
       kysely: '>=0.29'
 
-  kysely-wasm@2.0.1:
-    resolution: {integrity: sha512-yQTkPyoJe/tZhmRgal1vVZzVkmxWikkPCzw/P1aP4ms6OlrSRkIIeF+US3gp3vq3tX0Y/dSsVIKn68lmunCqtA==}
+  kysely-wasqlite-worker@2.0.1:
+    resolution: {integrity: sha512-/2W0O8GTmSEvh2QjaLb9Gxx4FISN3oLj7uqPOmwGw6+rWcczatbRqbPgePd7fYez+WFHyCW3HIUoFTY9UrKlYQ==}
     peerDependencies:
+      '@subframe7536/sqlite-wasm': '>=0.5.0'
       kysely: '>=0.29'
 
   kysely@0.29.9:
@@ -839,9 +834,6 @@ packages:
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
     engines: {node: '>=0.10.0'}
-
-  sql.js@1.16.0:
-    resolution: {integrity: sha512-q/JOZuJfmVh8Zf8Eo+cMJvtxAWeWBqTfJ6AQYGXZmcaLGHMwhA2niH3fQYHrBtPeOss1ttzHec07K5+rHaMRMw==}
 
   tinyglobby@0.2.17:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
@@ -1077,12 +1069,12 @@ snapshots:
 
   '@rolldown/pluginutils@1.1.1': {}
 
+  '@subframe7536/sqlite-wasm@1.4.1': {}
+
   '@tybys/wasm-util@0.10.4':
     dependencies:
       tslib: 2.9.1
     optional: true
-
-  '@types/emscripten@1.41.6': {}
 
   '@types/node@24.19.2':
     dependencies:
@@ -1095,11 +1087,6 @@ snapshots:
   '@types/react@19.3.0':
     dependencies:
       csstype: 3.2.3
-
-  '@types/sql.js@1.4.11':
-    dependencies:
-      '@types/emscripten': 1.41.6
-      '@types/node': 24.19.2
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
@@ -1210,8 +1197,9 @@ snapshots:
     dependencies:
       kysely: 0.29.9
 
-  kysely-wasm@2.0.1(kysely@0.29.9):
+  kysely-wasqlite-worker@2.0.1(@subframe7536/sqlite-wasm@1.4.1)(kysely@0.29.9):
     dependencies:
+      '@subframe7536/sqlite-wasm': 1.4.1
       kysely: 0.29.9
       kysely-generic-sqlite: 2.0.1(kysely@0.29.9)
 
@@ -1318,8 +1306,6 @@ snapshots:
   scheduler@0.28.0: {}
 
   source-map-js@1.2.2: {}
-
-  sql.js@1.16.0: {}
 
   tinyglobby@0.2.17:
     dependencies:

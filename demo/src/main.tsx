@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import type { Kysely } from 'kysely';
 import { App } from './App';
-import { initDB, persistNow } from './db';
+import { initDB, markSeeded } from './db';
 import { configureEngine, isConfigured, loadSettings, withWrite } from './sync';
 import { ensureVirtualDav } from './virtual-dav';
 import { getLang, SEED_ITEMS, t } from './i18n';
@@ -46,10 +46,11 @@ async function seedIfFresh(db: Kysely<DB>, fresh: boolean): Promise<void> {
           created_at: now,
           updated_at: now,
         })
+        .onConflict((oc) => oc.column('id').doNothing())
         .execute();
     }
   });
-  await persistNow();
+  await markSeeded();
 }
 
 async function boot(): Promise<void> {
@@ -71,7 +72,6 @@ async function boot(): Promise<void> {
     if (isConfigured()) {
       try {
         await engine.sync();
-        await persistNow();
       } catch (e) {
         console.warn('Initial sync failed (retry manually later)', e);
       }

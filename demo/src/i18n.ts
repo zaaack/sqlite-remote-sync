@@ -5,7 +5,7 @@ export type Lang = 'zh' | 'en';
 /** All UI strings. `en` is type-checked against the `zh` key set. */
 const zh = {
   'app.title': 'Sync Notes · Todo / 笔记 · WebDAV 同步',
-  'app.description': 'Todo / 笔记 demo：分类与标签、提醒、WebDAV 同步、导入导出。基于 sqlite-remote-sync + React + Kysely (SQLite WASM)。',
+  'app.description': 'Todo / 笔记 demo：分类与标签、提醒、WebDAV 同步、导入导出。基于 sqlite-remote-sync + React + Kysely + wa-sqlite（kysely-wasqlite-worker，IndexedDB VFS）。',
   'app.subtitle': 'Todo · 笔记 · WebDAV 同步',
   'app.logo': '记',
   'app.demoTag': 'demo',
@@ -28,7 +28,7 @@ const zh = {
   'nav.clear': '清除',
   'nav.noCategories': '暂无分类',
   'nav.noTags': '暂无标签',
-  'nav.footer': '基于 sqlite-remote-sync 的 GitHub Pages 演示 · React + Kysely (SQLite WASM) · 数据自动刷新',
+  'nav.footer': '基于 sqlite-remote-sync 的 GitHub Pages 演示 · React + Kysely + wa-sqlite (IndexedDB VFS) · 数据自动刷新',
   'count.suffix': '{n} 项',
   'clearFilters': '清除筛选',
 
@@ -127,7 +127,7 @@ const zh = {
   'settings.interval': '间隔（秒）',
   'settings.credentialsHint': '凭据仅保存在本浏览器 localStorage，请只在自己的设备上使用。',
   'settings.danger': '危险操作',
-  'settings.resetLocalHint': '删除本标签页的 SQLite 文件（不会影响远端 WebDAV 数据）。',
+  'settings.resetLocalHint': '删除本标签页的本地 SQLite 数据库（IndexedDB 中的 wa-sqlite 分页数据），不影响远端 WebDAV 数据。',
   'settings.badUrl': 'WebDAV 地址格式不正确',
 
   'sync.syncing': '正在同步…',
@@ -154,6 +154,7 @@ const zh = {
   'toast.notifyError': '无法请求通知权限：{msg}',
   'toast.exportedJson': '已导出 {n} 条 (JSON)',
   'toast.exportedSqlite': '已导出 SQLite 数据库文件 (.sqlite)',
+  'toast.exportSqliteFailed': '导出 SQLite 文件失败：{msg}',
   'toast.imported': '已导入 {n} 条；点「⟳ 同步」可上传到 WebDAV',
   'toast.importFailed': '导入失败：{msg}',
   'toast.missingItems': '缺少 items 数组',
@@ -163,7 +164,7 @@ const zh = {
   'toast.resetDemoConfirm': '确定清空演示服务的数据并重载？所有标签页的演示数据都会被清除。',
 
   'empty.title': '还没有内容',
-  'empty.body': '点右上角「＋ 新建」创建待办或笔记。数据存于本地 SQLite，可在「设置」里选择同步模式。',
+  'empty.body': '点右上角「＋ 新建」创建待办或笔记。数据存于本地 SQLite（IndexedDB VFS），可在「设置」里选择同步模式。',
   'empty.noMatchTitle': '没有匹配的内容',
   'empty.noMatchBody': '试试清除筛选条件或换个关键词。',
 
@@ -180,7 +181,7 @@ export type TKey = keyof typeof zh;
 
 const en: Record<TKey, string> = {
   'app.title': 'Sync Notes · Todo / Notes · WebDAV sync',
-  'app.description': 'Todo / Notes demo: categories, tags, reminders, WebDAV sync, import/export. Built on sqlite-remote-sync + React + Kysely (SQLite WASM).',
+  'app.description': 'Todo / Notes demo: categories, tags, reminders, WebDAV sync, import/export. Built on sqlite-remote-sync + React + Kysely + wa-sqlite (kysely-wasqlite-worker, IndexedDB VFS).',
   'app.subtitle': 'Todo · Notes · WebDAV sync',
   'app.logo': 'N',
   'app.demoTag': 'demo',
@@ -203,7 +204,7 @@ const en: Record<TKey, string> = {
   'nav.clear': 'Clear',
   'nav.noCategories': 'No categories',
   'nav.noTags': 'No tags',
-  'nav.footer': 'A GitHub Pages demo built on sqlite-remote-sync · React + Kysely (SQLite WASM) · auto-refreshing queries',
+  'nav.footer': 'A GitHub Pages demo built on sqlite-remote-sync · React + Kysely + wa-sqlite (IndexedDB VFS) · auto-refreshing queries',
   'count.suffix': '{n} items',
   'clearFilters': 'Clear filters',
 
@@ -302,7 +303,7 @@ const en: Record<TKey, string> = {
   'settings.interval': 'Interval (sec)',
   'settings.credentialsHint': 'Credentials are stored only in this browser\'s localStorage. Use this on your own devices only.',
   'settings.danger': 'Danger zone',
-  'settings.resetLocalHint': 'Deletes this tab\'s SQLite file (does not touch remote WebDAV data).',
+  'settings.resetLocalHint': 'Deletes this tab\'s local SQLite database (wa-sqlite pages in IndexedDB). Remote WebDAV data is untouched.',
   'settings.badUrl': 'Invalid WebDAV URL',
 
   'sync.syncing': 'Syncing…',
@@ -329,6 +330,7 @@ const en: Record<TKey, string> = {
   'toast.notifyError': 'Could not request notification permission: {msg}',
   'toast.exportedJson': 'Exported {n} items (JSON)',
   'toast.exportedSqlite': 'Exported SQLite database file (.sqlite)',
+  'toast.exportSqliteFailed': 'Failed to export SQLite file: {msg}',
   'toast.imported': 'Imported {n} items; click "↻ Sync" to upload',
   'toast.importFailed': 'Import failed: {msg}',
   'toast.missingItems': 'Missing items array',
@@ -338,7 +340,7 @@ const en: Record<TKey, string> = {
   'toast.resetDemoConfirm': 'Clear the demo server data and reload? Demo data in every tab will be removed.',
 
   'empty.title': 'Nothing here yet',
-  'empty.body': 'Click "＋ New" to create a todo or note. Data lives in local SQLite; pick a sync mode in Settings.',
+  'empty.body': 'Click "＋ New" to create a todo or note. Data lives in local SQLite (IndexedDB VFS); pick a sync mode in Settings.',
   'empty.noMatchTitle': 'No matches',
   'empty.noMatchBody': 'Try clearing filters or changing the keyword.',
 
@@ -436,7 +438,7 @@ export const SEED_ITEMS: Record<Lang, SeedItem[]> = {
       kind: 'note',
       title: '关于这个 Demo',
       body:
-        '数据存在浏览器里的 SQLite (WASM)，由 Kysely + kysely-wasm 读写。\n' +
+        '数据存在浏览器里的 SQLite（wa-sqlite / IndexedDB VFS），由 Kysely + kysely-wasqlite-worker 读写。\n' +
         '默认「演示模式」用 Service Worker 模拟 WebDAV，多个标签页会自动互相同步。\n' +
         '列表通过 useQuery 自动刷新，写入直接走 Kysely，无需手动 render。',
       category: '示例',
@@ -465,7 +467,7 @@ export const SEED_ITEMS: Record<Lang, SeedItem[]> = {
       kind: 'note',
       title: 'About this demo',
       body:
-        'Data lives in a SQLite (WASM) database in the browser, read and written with Kysely + kysely-wasm.\n' +
+        'Data lives in a SQLite database in the browser (wa-sqlite / IndexedDB VFS), read and written with Kysely + kysely-wasqlite-worker.\n' +
         'The default "Demo mode" simulates WebDAV in a Service Worker, so multiple tabs sync with each other.\n' +
         'The list auto-refreshes through useQuery; all writes go straight through Kysely.',
       category: 'Sample',

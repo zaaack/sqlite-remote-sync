@@ -2,7 +2,7 @@
 
 一个纯前端、离线优先的 Todo / 笔记应用，直接跑在 GitHub Pages 上，**打开两个标签页就能看到实时同步**。
 
-技术栈：**TypeScript 7 + Vite 8 + pnpm 12 + React 19 + kysely-wasm**，使用本仓库
+技术栈：**TypeScript 7 + Vite 8 + pnpm 12 + React 19 + kysely-wasqlite-worker + wa-sqlite**，使用本仓库
 `sqlite-remote-sync` 的 `createSyncEngine`、`WebDavBackend` 与 **`sqlite-remote-sync/react`** 插件。
 仓库是 pnpm workspace，`demo/` 通过 `workspace:*` 依赖主库。
 
@@ -27,9 +27,10 @@ IndexedDB 和 Service Worker 都是**同源所有标签页共享**的，所以�
 另一端 debounce 后调用 `engine.sync()`；`sqlite-remote-sync/react` 的 `useQuery`
 收到引擎 `pull` 事件后自动重跑。另有 10 秒自动同步兜底。
 
-每个标签页有独立的 `siteId`（`sessionStorage` + `?tab=` 覆盖）和独立的本地 SQLite 文件
-（IndexedDB key 按标签页区分），互不当成同一台设备。设置里可一键清空演示服务数据，
-会广播给所有标签页一起重置。
+每个标签页有独立的 `siteId`（`sessionStorage` + `?tab=` 覆盖）和独立的 `fileName`
+（`todo-<tabId>.sqlite`），`useIdbStorage` 据此打开独立的 IndexedDB 库（`IDBBatchAtomicVFS`），
+互不当成同一台设备。IDB 后端需要 Web Locks API 与 HTTPS/localhost，**不需要 COOP/COEP 响应头**。
+设置里可一键清空演示服务数据，会广播给所有标签页一起重置。
 
 ### 为什么不用 WebContainers
 
@@ -99,7 +100,7 @@ cd demo/dist && python3 -m http.server 8080
 ## 架构 / 数据流
 
 ```
-sql.js (WASM) ──► SqlJsDialect (kysely-wasm) ──► Kysely<DB>
+wa-sqlite (WASM) ──► WaSqliteWorkerDialect (kysely-wasqlite-worker) ──► Kysely<DB>
                        │                                │
               fromKysely(db)                  <SyncProvider db engine>
                        │                                │
@@ -119,7 +120,8 @@ sql.js (WASM) ──► SqlJsDialect (kysely-wasm) ──► Kysely<DB>
 - `public/sw.js` — 虚拟 WebDAV 服务器；`src/virtual-dav.ts` — 注册 SW、拿到 controller、
   生成演示 URL、`X-Demo-Tab` 头、清空远端。
 - `src/tab.ts` — 每标签页独立 id（`?tab=` 优先，否则 sessionStorage）。
-- `src/db.ts` — sql.js WASM、按标签页分 key 的 IndexedDB 持久化、建表、
+- `src/db.ts` — `WaSqliteWorkerDialect({ fileName, preferOPFS: false, url, worker, onCreateConnection })`、
+  IDB VFS 自动持久化（按标签页分 fileName）、`seeded` 标记、建表、
   `fromKysely(db, { compiledQuery: CompiledQuery.raw })`。
 - `src/sync.ts` — 三种模式、`siteId`、`createSyncEngine`（`strategy: 'field'`、`compress`、
   retry、自动同步）。
@@ -162,15 +164,19 @@ replay/ingest 写入走 `executeQuery(RawNode)`，被插件排除，不会造成
 
 ## 导入 / 导出 / 提醒
 
-- 导出 JSON（可再导入）、导出真 `.sqlite` 文件（`SQLite format 3`）。
+- 导出 JSON（可再导入）、导出真 `.sqlite` 文件（`SQLite format 3`，由自定义 worker 的
+  `exportDatabase(core.vfs, core.path)` 生成）。
 - 导入 JSON：按 `id` upsert，列表自动刷新，并会同步到其他标签页。
 - 提醒只在页面打开时检查（GitHub Pages 没有后端推送）；授予桌面通知权限后会弹系统通知。
   改过截止时间/提醒间隔会重新武装提醒。
 
 ## 已知限制
 
-- 演示数据存在本浏览器 IndexedDB（按标签页区分本地 SQLite + 共享的虚拟 WebDAV 存储）；
+- 演示数据存在本浏览器 IndexedDB（按标签页分的 wa-sqlite 分页 VFS 库 + 共享的虚拟 WebDAV 存储）；
   清浏览器数据会清空。不同访客之间互不可见（IndexedDB 按 origin 隔离，这本就是预期行为）。
+- 本地库用 `IDBBatchAtomicVFS` 分页存储，不再是整文件快照；依赖 Web Locks API 与安全上下文
+  （HTTPS / localhost），**不需要 COOP/COEP**（GitHub Pages 无法设置自定义响应头）。
+- 旧版 sql.js 的整文件快照与 VFS 分页格式不兼容，升级后不迁移；数据可从虚拟 WebDAV 拉回。
 - 标签页关闭再打开会分配新的 `siteId`，本地 SQLite 重新初始化，但可从虚拟 WebDAV 拉回全部数据。
 - 提醒依赖页面打开；`useQuery` 目前对任意改动都会重跑所有活跃查询（无表级失效），对本地小库足够。
 - 用 `sql\`...\`.execute()` 之类绕过 Kysely 查询构造器的写入不会自动通知，需调用
@@ -181,7 +187,7 @@ replay/ingest 写入走 `executeQuery(RawNode)`，被插件排除，不会造成
 ```
 demo/
 ├── index.html            Vite 入口
-├── vite.config.ts        base: './'、@vitejs/plugin-react
+├── vite.config.ts        base: './'、@vitejs/plugin-react、worker.format: 'es'
 ├── tsconfig.json         TS7 (strict, react-jsx)
 ├── public/
 │   ├── .nojekyll
@@ -189,7 +195,8 @@ demo/
 ├── src/
 │   ├── main.tsx          启动引导 + 固定 id 示例数据
 │   ├── App.tsx           React UI（全部走 react 插件）
-│   ├── db.ts             sql.js + kysely-wasm + IndexedDB（按标签页分 key）
+│   ├── db.ts             wa-sqlite + kysely-wasqlite-worker + IndexedDB VFS（按标签页分 fileName）
+│   ├── sqlite-worker.ts   自定义 worker（export / reset 请求）
 │   ├── sync.ts           三种同步模式 / 引擎 / siteId
 │   ├── virtual-dav.ts    SW 注册、演示 URL、广播头、清空
 │   ├── tab.ts            每标签页独立身份

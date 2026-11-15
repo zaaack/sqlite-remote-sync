@@ -1,20 +1,26 @@
 import { CompiledQuery, Kysely } from 'kysely';
-import { SqlJsDialect } from 'kysely-wasm';
-import initSqlJs from 'sql.js';
-import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
+import { WaSqliteWorkerDialect } from 'kysely-wasqlite-worker';
+import wasmAssetUrl from '@subframe7536/sqlite-wasm/dist/wa-sqlite-async.wasm?url';
 import { fromKysely } from 'sqlite-remote-sync';
 import type { SqliteAdapter } from 'sqlite-remote-sync';
 import type { DB } from './types';
 import { getTabId } from './tab';
 
-type SqlJsDb = InstanceType<Awaited<ReturnType<typeof initSqlJs>>['Database']>;
-
+// The demo's own IndexedDB only holds the "already seeded" marker; the actual
+// SQLite pages live in the VFS's own database (<fileName>.db).
 const IDB_NAME = 'srs-todo-notes';
 const IDB_STORE = 'kv';
-const LEGACY_DB_KEY = 'sqlite';
-// Each tab owns its own SQLite file, exactly like two separate devices. A
-// single shared key would make the tabs overwrite each other's local state.
-const DB_KEY = `sqlite:${getTabId()}`;
+const SEEDED_KEY = `seeded:${getTabId()}`;
+
+// Each tab owns its own SQLite file, exactly like two separate devices.
+// useIdbStorage() opens `<fileName>.db` in IndexedDB and keys its Web Locks
+// by that name, so the two tabs never contend for the same lock.
+const FILE_NAME = `todo-${getTabId()}.sqlite`;
+const VFS_IDB_NAME = `${FILE_NAME}.db`;
+
+// `base: './'` makes Vite emit a document-relative URL, but the worker's
+// locateFile() would resolve it against the worker chunk. Resolve it here.
+const WASM_URL = new URL(wasmAssetUrl, document.baseURI).href;
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS items (
@@ -32,10 +38,16 @@ CREATE TABLE IF NOT EXISTS items (
   updated_at TEXT NOT NULL
 );`;
 
-let raw: SqlJsDb | null = null;
+// The runtime connection is a GenericSqliteWorkerConnection, which has a
+// request() method that Kysely's DatabaseConnection type does not declare.
+interface WorkerConnection {
+  request<T = unknown>(type: string, payload?: unknown): Promise<T>;
+}
+
 let adapter: SqliteAdapter | null = null;
-let persistTimer: ReturnType<typeof setTimeout> | undefined;
-let fresh = false;
+let connection: WorkerConnection | null = null;
+let markReady!: () => void;
+const connectionReady = new Promise<void>((resolve) => { markReady = resolve; });
 
 export interface Boot {
   db: Kysely<DB>;
@@ -56,18 +68,18 @@ function openIDB(): Promise<IDBDatabase> {
   });
 }
 
-function idbGet(key: string): Promise<Uint8Array | undefined> {
+function idbGet<T = unknown>(key: string): Promise<T | undefined> {
   return openIDB().then(
     (idb) =>
       new Promise((resolve, reject) => {
         const r = idb.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
-        r.onsuccess = () => resolve(r.result as Uint8Array | undefined);
+        r.onsuccess = () => resolve(r.result as T | undefined);
         r.onerror = () => reject(r.error);
       }),
   );
 }
 
-function idbPut(key: string, value: Uint8Array): Promise<void> {
+function idbPut(key: string, value: unknown): Promise<void> {
   return openIDB().then(
     (idb) =>
       new Promise((resolve, reject) => {
@@ -79,34 +91,43 @@ function idbPut(key: string, value: Uint8Array): Promise<void> {
   );
 }
 
+function idbDelete(key: string): Promise<void> {
+  return openIDB().then(
+    (idb) =>
+      new Promise((resolve, reject) => {
+        const tx = idb.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }),
+  );
+}
+
 /**
- * Boot the local database: load sql.js (WASM), restore the SQLite file from
- * IndexedDB, expose a Kysely instance backed by kysely-wasm's SqlJsDialect,
- * and build the sync-engine adapter from that same Kysely instance.
+ * Boot the local database: wa-sqlite in a Web Worker with an IndexedDB VFS
+ * (IDBBatchAtomicVFS, no OPFS), exposed through kysely-wasqlite-worker, then
+ * build the sync-engine adapter from that same Kysely instance.
  */
 export async function initDB(): Promise<Boot> {
-  const SQL = await initSqlJs({ locateFile: () => wasmUrl });
+  const fresh = (await idbGet<number>(SEEDED_KEY)) === undefined;
 
-  let bytes: Uint8Array | undefined;
-  try {
-    bytes = await idbGet(DB_KEY);
-    // One-time upgrade from the old single shared key.
-    if (!bytes || !bytes.length) bytes = await idbGet(LEGACY_DB_KEY);
-  } catch (e) {
-    console.warn('IndexedDB unavailable, running in memory only', e);
-  }
-  fresh = !(bytes && bytes.length);
-  if (!fresh && bytes) {
-    // Adopt the legacy file under this tab's key so each tab diverges cleanly.
-    try { await idbPut(DB_KEY, bytes); } catch { /* non-fatal */ }
-  }
-
-  raw = (fresh ? new SQL.Database() : new SQL.Database(bytes)) as SqlJsDb;
-  raw.run(DDL);
-
-  const db = new Kysely<DB>({
-    dialect: new SqlJsDialect({ database: raw }),
+  const dialect = new WaSqliteWorkerDialect({
+    fileName: FILE_NAME,
+    // IndexedDB VFS, not OPFS. No COOP/COEP headers needed (GitHub Pages).
+    preferOPFS: false,
+    // preferOPFS:false makes the dialect call url(true) => async wasm build.
+    url: () => WASM_URL,
+    worker: () => new Worker(new URL('./sqlite-worker.ts', import.meta.url), { type: 'module' }),
+    onCreateConnection: (conn) => {
+      connection = conn as unknown as WorkerConnection;
+      markReady();
+    },
   });
+
+  const db = new Kysely<DB>({ dialect });
+  // Also forces the worker's async driver.init() (and onCreateConnection) to
+  // finish before the instance is handed to the sync engine.
+  await db.executeQuery(CompiledQuery.raw(DDL));
 
   adapter = fromKysely(db, {
     compiledQuery: (sql, params) => CompiledQuery.raw(sql, params),
@@ -115,9 +136,9 @@ export async function initDB(): Promise<Boot> {
   return { db, adapter, fresh };
 }
 
-/** True when this is the very first launch (no persisted file existed). */
-export function isFresh(): boolean {
-  return fresh;
+/** Record that the sample rows have been seeded (VFS persists data itself). */
+export async function markSeeded(): Promise<void> {
+  await idbPut(SEEDED_KEY, 1);
 }
 
 export function getAdapter(): SqliteAdapter {
@@ -125,41 +146,38 @@ export function getAdapter(): SqliteAdapter {
   return adapter;
 }
 
-/** Raw sql.js handle, used to export the real `.sqlite` file. */
-export function getRaw(): SqlJsDb {
-  if (!raw) throw new Error('Database not initialized');
-  return raw;
+/** Ask the worker to serialize the whole SQLite file (custom 'export' request). */
+export async function exportSQLiteBytes(): Promise<Uint8Array> {
+  await connectionReady;
+  if (!connection) throw new Error('Database not initialized');
+  return connection.request<Uint8Array>('export');
 }
 
-/** Persist the whole SQLite file to IndexedDB (offline-first local copy). */
-export async function persistNow(): Promise<void> {
-  if (!raw) return;
-  try {
-    await idbPut(DB_KEY, raw.export());
-  } catch (e) {
-    console.warn('Local persistence failed (private mode?)', e);
-  }
-}
-
-/** Debounced persist for high-frequency UI actions. Stable identity for the provider. */
-export function schedulePersist(): void {
-  if (persistTimer) clearTimeout(persistTimer);
-  persistTimer = setTimeout(() => {
-    persistTimer = undefined;
-    void persistNow();
-  }, 200);
-}
-
-/** Wipe the local SQLite file (settings "reset" action). */
+/** Wipe this tab's VFS database and its seeded marker. */
 export async function clearLocalDB(): Promise<void> {
   try {
-    const idb = await openIDB();
-    await new Promise<void>((resolve, reject) => {
-      const tx = idb.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).delete(DB_KEY);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
+    await connectionReady;
+    await connection?.request('reset');
+  } catch (e) {
+    console.warn('clearLocalDB: worker reset failed', e);
+    // Fallback: delete the VFS database from the main thread. The reload
+    // right after this call terminates the worker connection anyway.
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = indexedDB.deleteDatabase(VFS_IDB_NAME);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        req.onblocked = () => resolve();
+      });
+    } catch (e2) {
+      console.warn('clearLocalDB: deleteDatabase', e2);
+    }
+  }
+  try {
+    await idbDelete(SEEDED_KEY);
+    // Old sql.js whole-file snapshots are incompatible with the VFS pages.
+    await idbDelete('sqlite');
+    await idbDelete(`sqlite:${getTabId()}`);
   } catch (e) {
     console.warn('clearLocalDB:', e);
   }

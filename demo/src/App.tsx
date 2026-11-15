@@ -9,13 +9,7 @@ import {
   useSyncEvent,
 } from 'sqlite-remote-sync/react';
 import type { SyncEngine } from 'sqlite-remote-sync';
-import {
-  clearLocalDB,
-  getAdapter,
-  getRaw,
-  persistNow,
-  schedulePersist,
-} from './db';
+import { clearLocalDB, exportSQLiteBytes, getAdapter } from './db';
 import {
   configureEngine,
   getEngine,
@@ -496,12 +490,7 @@ export function App({ db, initialEngine }: AppProps) {
   return (
     // In offline mode the engine uses a throwaway MemoryBackend: let changes
     // accumulate in the outbox so they are pushed once a remote is configured.
-    <SyncProvider
-      db={db}
-      engine={engine}
-      syncAfterWrite={isConfigured()}
-      onChange={schedulePersist}
-    >
+    <SyncProvider db={db} engine={engine} syncAfterWrite={isConfigured()}>
       <Workspace onEngineChange={setEngine} />
     </SyncProvider>
   );
@@ -650,7 +639,6 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
         await kdb.updateTable('items').set({ notified: 1 }).where('id', '=', it.id).execute();
       }
     });
-    await persistNow();
   }, [kdb, toast]);
 
   // useQuery resolves asynchronously: wait for the first rows before the
@@ -686,10 +674,11 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
       timer = setTimeout(() => {
         const e = getEngine();
         if (!e) return;
-        void e.sync().then(async (stats) => {
-          await persistNow();
-          if (stats.appliedOps) toast(t('toast.remotelySynced', { n: stats.appliedOps }), 'success');
-        }).catch(() => { /* auto-sync will retry */ });
+        void e.sync()
+          .then((stats) => {
+            if (stats.appliedOps) toast(t('toast.remotelySynced', { n: stats.appliedOps }), 'success');
+          })
+          .catch(() => { /* auto-sync will retry */ });
       }, 250);
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
@@ -699,13 +688,7 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
     };
   }, [toast]);
 
-  /* ---------------- sync / persistence ------------------------------- */
-
-  // Engine bookkeeping (outbox/cursors) also lives in the SQLite file, so
-  // persist on every engine event, including background auto-sync.
-  useEffect(() => {
-    if (event) schedulePersist();
-  }, [event]);
+  /* ---------------- sync --------------------------------------------- */
 
   useEffect(() => {
     if (event?.type === 'error') toast(t('toast.autoSyncError', { msg: errorMessage(event.error) }), 'error');
@@ -741,7 +724,6 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
     }
     try {
       const stats = await sync.sync();
-      await persistNow();
       refresh();
       toast(t('toast.syncDone', { up: stats.pushedOps, down: stats.appliedOps }), 'success');
     } catch (e) {
@@ -756,11 +738,9 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
     try {
       const e = await configureEngine(s, getAdapter());
       onEngineChange(e);
-      await persistNow();
       if (isConfigured()) {
         toast(s.mode === 'demo' ? t('toast.switchedDemo') : t('toast.configSaved'), 'success');
         const stats = await e.sync();
-        await persistNow();
         refresh();
         toast(t('toast.syncDone', { up: stats.pushedOps, down: stats.appliedOps }), 'success');
       } else {
@@ -809,11 +789,15 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
     toast(t('toast.exportedJson', { n: items.length }), 'success');
   }, [items, toast]);
 
-  const exportSQLite = useCallback((): void => {
-    // copy into a fresh ArrayBuffer so TS7's generic typed arrays satisfy BlobPart
-    const bytes = new Uint8Array(getRaw().export());
-    download(new Blob([bytes], { type: 'application/octet-stream' }), `todo-notes-${stamp()}.sqlite`);
-    toast(t('toast.exportedSqlite'), 'success');
+  const exportSQLite = useCallback(async (): Promise<void> => {
+    try {
+      // copy into a fresh ArrayBuffer so TS7's generic typed arrays satisfy BlobPart
+      const bytes = new Uint8Array(await exportSQLiteBytes());
+      download(new Blob([bytes], { type: 'application/octet-stream' }), `todo-notes-${stamp()}.sqlite`);
+      toast(t('toast.exportedSqlite'), 'success');
+    } catch (e) {
+      toast(t('toast.exportSqliteFailed', { msg: errorMessage(e) }), 'error');
+    }
   }, [toast]);
 
   const importJSON = useCallback(async (file: File): Promise<void> => {
@@ -830,7 +814,6 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
         }
       });
       refresh();
-      await persistNow();
       toast(t('toast.imported', { n: values.length }), 'success');
     } catch (e) {
       toast(t('toast.importFailed', { msg: errorMessage(e) }), 'error');
@@ -886,7 +869,7 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
             <button id="btn-export" className="btn ghost" aria-haspopup="true" onClick={(e) => { e.stopPropagation(); setExportOpen((o) => !o); }}>{t('btn.export')}</button>
             <div className={`menu ${exportOpen ? 'open' : ''}`}>
               <button onClick={() => { setExportOpen(false); exportJSON(); }}>{t('export.json')}</button>
-              <button onClick={() => { setExportOpen(false); exportSQLite(); }}>{t('export.sqlite')}</button>
+              <button onClick={() => { setExportOpen(false); void exportSQLite(); }}>{t('export.sqlite')}</button>
             </div>
           </div>
           <button id="btn-settings" className="btn ghost" title={t('title.settings')} onClick={() => setSettingsOpen(true)}>{t('btn.settings')}</button>
