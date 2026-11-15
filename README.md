@@ -13,6 +13,9 @@ One code path for every JS SQLite runtime — `kysely-sqlite-tools`, browser/OPF
 - Delta-only, gzip-compressed, chunked segments — 500 rows produce as few as **2 remote objects**; chunk count and size are configurable.
 - Logical snapshots + compaction + gc so WebDAV holds `O(devices)` objects, not `O(writes)`.
 - Optional **Kysely plugin** that triggers a sync right after a write completes.
+- **`sqlite-remote-sync/react`** — direct Kysely CRUD in React with **auto-refreshing queries** (`useQuery` re-runs after local writes and remote pulls). See [React plugin](./docs/react.md).
+
+**Live demo** — a [Todo / Notes app](./demo/) with categories, tags, reminders, WebDAV sync, import/export and a **Chinese / English switch**, running entirely in the browser on GitHub Pages. Built with **TypeScript 7 + Vite 8 + React 19 + kysely-wasm** (SQLite WASM) and the React plugin above. By default it runs in **demo mode**: a Service Worker implements a virtual WebDAV server in the browser (IndexedDB-backed), so **opening two tabs shows real bidirectional sync with zero setup** — no backend, no CORS, no COOP/COEP headers. See [demo/README.md](./demo/README.md).
 
 ---
 
@@ -63,6 +66,36 @@ engine.startAutoSync(30_000);       // optional periodic sync
 ```
 
 `siteId` must be stable and unique per device. All devices must use the same `appId`, table config, `strategy` and `resolver`.
+
+---
+
+## React: Kysely CRUD with automatic refresh
+
+`sqlite-remote-sync/react` turns a Kysely-backed SQLite database into a live
+data source. Write with the Kysely query builder as usual; every `useQuery`
+result re-runs automatically after a local write **and** after the engine
+applies a remote pull.
+
+```tsx
+import { SyncProvider, useKysely, useQuery, useSync } from 'sqlite-remote-sync/react';
+
+<SyncProvider db={kysely} engine={engine}>
+  <Items />
+</SyncProvider>
+
+function Items() {
+  const db = useKysely<DB>();                       // live Kysely for CRUD
+  const { data } = useQuery<DB['items'][], DB>((d) =>
+    d.selectFrom('items').selectAll().execute());  // re-runs on any change
+  const sync = useSync();
+
+  return <>{/* add/upd/del with db.insertInto(...).execute() — no manual refresh */}</>;
+}
+```
+
+`createLiveKysely()` is also exported as a framework-agnostic core. Full API,
+options and caveats: **[React plugin docs](./docs/react.md)**. React is an
+optional peer (`>=18`); `kysely` remains optional too.
 
 ---
 
@@ -238,6 +271,7 @@ Two inefficiencies found by these measurements were fixed: a redundant `HEAD` af
 | [Conflict resolution](./docs/conflict-resolution.md) | LWW-Map semantics, `strategy`, custom resolvers, worked examples, pitfalls |
 | [Architecture](./docs/architecture.md) | Wire format, HLC, oplog, segments, manifests, snapshots, compaction, gc, correctness details |
 | [Frameworks](./docs/frameworks.md) | Detailed wiring for kysely-sqlite-tools, RN, Capacitor, Electron, Tauri, OPFS/worker |
+| [React plugin](./docs/react.md) | `sqlite-remote-sync/react`, `SyncProvider` / `useQuery` / `useKysely`, live queries & auto-refresh |
 | [Examples](./examples/) | Runnable REST/ETag reference backend |
 
 ---

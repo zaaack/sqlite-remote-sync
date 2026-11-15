@@ -19,6 +19,7 @@ contains a [Chinese guide to every document](../README.zh-CN.md#文档导航).
 | [Conflict resolution](./conflict-resolution.md) | LWW-Map semantics, `row` vs `field`, custom `ConflictResolver` (with worked examples), pitfalls |
 | [Architecture](./architecture.md) | Wire format, HLC, oplog, segments, manifests, snapshots, compaction, gc, crash safety |
 | [Frameworks](./frameworks.md) | Wiring for kysely-sqlite-tools dialects, React Native, Capacitor, Electron, Tauri, browser OPFS/worker |
+| [React plugin](./react.md) | `sqlite-remote-sync/react`: `SyncProvider`, `useQuery`, `useKysely` — direct Kysely CRUD with automatic data refresh |
 | [Examples](../examples/) | Runnable REST/ETag reference backend |
 
 ### Start here
@@ -41,6 +42,7 @@ contains a [Chinese guide to every document](../README.zh-CN.md#文档导航).
 | [Conflict resolution](./conflict-resolution.md) | LWW-Map 语义、`row` 与 `field`、自定义 `ConflictResolver`（含示例）、常见坑 |
 | [Architecture](./architecture.md) | 线格式、HLC、oplog、segment、manifest、快照、compact、gc、崩溃安全 |
 | [Frameworks](./frameworks.md) | kysely-sqlite-tools 各 dialect、React Native、Capacitor、Electron、Tauri、浏览器 OPFS/worker 接线 |
+| [React 插件](./react.md) | `sqlite-remote-sync/react`：`SyncProvider`、`useQuery`、`useKysely`，直接 Kysely 增删改查 + 数据自动刷新 |
 | [Examples](../examples/) | 可运行的 REST/ETag 参考服务端 |
 
 ### 阅读顺序

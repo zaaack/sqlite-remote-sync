@@ -10,6 +10,7 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
+    "types": ["node", "react"],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

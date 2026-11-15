@@ -5,7 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@12.21.0",
   "keywords": [
     "sqlite",
     "sync",
@@ -43,6 +43,10 @@
     "./kysely": {
       "types": "./dist/kysely-plugin.d.ts",
       "import": "./dist/kysely-plugin.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
     }
   },
   "files": [
@@ -54,6 +58,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "build:demo": "pnpm run build && pnpm --filter sqlite-remote-sync-demo run build",
+    "dev:demo": "pnpm run build && pnpm --filter sqlite-remote-sync-demo run dev",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "test:e2e": "tsx --test test/webdav-e2e.test.ts",
@@ -61,19 +67,25 @@
     "preversion": "pnpm test"
   },
   "peerDependencies": {
-    "kysely": ">=0.29"
+    "kysely": ">=0.29",
+    "react": ">=18"
   },
   "peerDependenciesMeta": {
     "kysely": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     }
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "kysely": "^0.29.0",
+    "@types/react": "^19.3.0",
+    "kysely": "^0.29.9",
     "kysely-generic-sqlite": "^2.0.1",
+    "react": "^19.3.1",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0",
+    "typescript": "^7.0.0",
     "webdav-server": "^2.6.3"
   },
   "engines": {

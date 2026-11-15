@@ -1,0 +1,71 @@
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'demo/**'
+      - 'src/**'
+      - 'docs/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one concurrent deployment; skip queued runs between in-progress and latest.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.21.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Builds the library (dist/) first, then the Vite app (demo/dist/),
+      # because the demo resolves `sqlite-remote-sync` from dist/.
+      - name: Build library + demo
+        run: pnpm run build:demo
+
+      # Demo mode needs the standalone service worker at the site root. It must
+      # never be bundled or hashed, otherwise the virtual WebDAV server 404s.
+      - name: Verify virtual WebDAV worker is present
+        run: test -s demo/dist/sw.js && echo "sw.js ok"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload demo/dist as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: demo/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

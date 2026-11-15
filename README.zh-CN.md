@@ -13,6 +13,9 @@
 - 增量、gzip 压缩、分块 segment —— 500 行最少只产生 **2 个远端对象**；块数与块大小均可配置。
 - 逻辑快照 + compact + gc，让 WebDAV 上的对象数是 `O(设备数)` 而非 `O(写入次数)`。
 - 可选 **Kysely 插件**，写入完成后立即触发同步。
+- **`sqlite-remote-sync/react`** —— React 里直接对 Kysely 增删改查，**数据自动刷新**（本地写入或远端 pull 后 `useQuery` 自动重跑）。见 [React 插件文档](./docs/react.md)。
+
+**在线演示** — 一个带分类 / 标签 / 提醒 / WebDAV 同步 / 导入导出、**中英文切换**的 [Todo·笔记 demo](./demo/)，纯浏览器运行，采用 **TypeScript 7 + Vite 8 + React 19 + kysely-wasm**（SQLite WASM）并使用了上面的 React 插件，可一键部署到 GitHub Pages。默认开启**演示模式**：用 Service Worker 在浏览器内实现一个虚拟 WebDAV 服务器（IndexedDB 存储），**打开两个标签页即可看到真实的双向同步**，无需后端、无需 CORS、无需 COOP/COEP 响应头，见 [demo/README.md](./demo/README.md)。
 
 ---
 
@@ -63,6 +66,34 @@ engine.startAutoSync(30_000);       // 可选：定时同步
 ```
 
 `siteId` 必须稳定且全局唯一。所有设备必须使用相同的 `appId`、表配置、`strategy` 和 `resolver`。
+
+---
+
+## React：直接 Kysely 增删改查 + 数据自动刷新
+
+`sqlite-remote-sync/react` 把 Kysely 托管的 SQLite 变成响应式数据源：照常用
+Kysely 写库，本地写入或引擎 pull 落地远端改动后，所有 `useQuery` 会自动重跑，
+无需手动刷新。
+
+```tsx
+import { SyncProvider, useKysely, useQuery, useSync } from 'sqlite-remote-sync/react';
+
+<SyncProvider db={kysely} engine={engine}>
+  <Items />
+</SyncProvider>
+
+function Items() {
+  const db = useKysely<DB>();                       // 用于增删改查的 live Kysely
+  const { data } = useQuery<DB['items'][], DB>((d) =>
+    d.selectFrom('items').selectAll().execute());  // 数据变化自动重跑
+  const sync = useSync();
+
+  return <>{/* db.insertInto(...).execute() 即可，无需手动 render */}</>;
+}
+```
+
+`createLiveKysely()` 也单独导出，可在非 React 环境使用。完整 API、配置项与注意点见
+**[React 插件文档](./docs/react.md)**。React 是可选 peer（`>=18`），`kysely` 同样可选。
 
 ---
 
@@ -236,6 +267,7 @@ await engine.close();
 | [Conflict resolution](./docs/conflict-resolution.md) | LWW-Map 语义、`strategy`、自定义解析器、可运行示例、常见坑 |
 | [Architecture](./docs/architecture.md) | 线格式、HLC、oplog、segment、manifest、快照、compact、gc、正确性细节 |
 | [Frameworks](./docs/frameworks.md) | kysely-sqlite-tools、RN、Capacitor、Electron、Tauri、OPFS/worker 的详细接线 |
+| [React 插件](./docs/react.md) | `sqlite-remote-sync/react`：`SyncProvider` / `useQuery` / `useKysely`，实时查询与数据自动刷新 |
 | [examples](./examples/) | 可运行的 REST/ETag 参考服务端 |
 
 ---
