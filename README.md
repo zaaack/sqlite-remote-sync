@@ -15,7 +15,7 @@ One code path for every JS SQLite runtime — `kysely-sqlite-tools`, browser/OPF
 - Optional **Kysely plugin** that triggers a sync right after a write completes.
 - **`sqlite-remote-sync/react`** — direct Kysely CRUD in React with **auto-refreshing queries** (`useQuery` re-runs after local writes and remote pulls). See [React plugin](./docs/react.md).
 
-**Live demo** — a [Todo / Notes app](./demo/) with categories, tags, reminders, WebDAV sync, import/export and a **Chinese / English switch**, running entirely in the browser on GitHub Pages. Built with **TypeScript 7 + Vite 8 + React 19 + kysely-wasm** (SQLite WASM) and the React plugin above. By default it runs in **demo mode**: a Service Worker implements a virtual WebDAV server in the browser (IndexedDB-backed), so **opening two tabs shows real bidirectional sync with zero setup** — no backend, no CORS, no COOP/COEP headers. See [demo/README.md](./demo/README.md).
+**Live demo** — a [Todo / Notes app](https://zaaack.github.io/sqlite-remote-sync/) with categories, tags, reminders, WebDAV sync, import/export and a **Chinese / English switch**, running entirely in the browser on GitHub Pages. Built with **TypeScript 7 + Vite 8 + React 19 + kysely-wasm** (SQLite WASM) and the React plugin above. By default it runs in **demo mode**: a Service Worker implements a virtual WebDAV server in the browser (IndexedDB-backed), so **opening two tabs shows real bidirectional sync with zero setup** — no backend, no CORS, no COOP/COEP headers. See [demo/README.md](./demo/README.md).
 
 ---
 
