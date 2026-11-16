@@ -159,7 +159,13 @@ export function createSyncEngine(config: SyncConfig): SyncEngine {
 
   const assertReady = (): void => {
     if (!st.initialized) throw new Error('sqlite-remote-sync: call await engine.init() first');
-    if (st.closed) throw new Error('sqlite-remote-sync: engine is closed');
+    if (st.closed) {
+      throw new Error(
+        'sqlite-remote-sync: engine is closed. This engine was disposed, usually because ' +
+          'a newer engine replaced it during a reconfiguration. Obtain the current engine ' +
+          'from your engine manager before calling push()/pull()/sync() again.',
+      );
+    }
   };
 
   const retry = config.retry;
@@ -718,8 +724,13 @@ export function createSyncEngine(config: SyncConfig): SyncEngine {
       return () => st.listeners.delete(listener);
     },
     async close(): Promise<void> {
+      if (st.closed) return; // idempotent
       engine.stopAutoSync();
-      st.closed = true;
+      // Drain any in-flight op (and anything queued behind it) before marking
+      // the engine closed, so close() never races a running push/pull.
+      await mutex(() => {
+        st.closed = true;
+      });
       await db.close?.();
     },
     async trackChange(table: string, primaryKey: readonly SqlValue[]): Promise<void> {
@@ -730,9 +741,12 @@ export function createSyncEngine(config: SyncConfig): SyncEngine {
     },
   };
 
-  /** Wrap a sync operation: serialize + set the reentrancy guard. */
+  /** Wrap a sync operation: serialize + set the reentrancy guard. The `closed`
+   * flag is re-checked under the lock so a concurrent `close()` that waits for
+   * the mutex can never be bypassed by an op that queued before it. */
   async function guard<T>(fn: () => Promise<T>): Promise<T> {
     return mutex(async () => {
+      assertReady();
       st.syncing = true;
       try {
         return await fn();

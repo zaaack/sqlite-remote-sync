@@ -362,7 +362,7 @@ function Editor({ item, categories, onSave, onDelete, onClose }: EditorProps) {
 
 interface SettingsProps {
   settings: Settings;
-  onSave: (s: Settings) => void;
+  onSave: (s: Settings) => void | Promise<void>;
   onCancel: () => void;
   onReset: () => void;
   onResetDemo: () => void;
@@ -372,11 +372,13 @@ function SettingsPanel({ settings, onSave, onCancel, onReset, onResetDemo }: Set
   useLang();
   const [form, setForm] = useState<Settings>(settings);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const set = <K extends keyof Settings>(k: K, value: Settings[K]): void =>
     setForm((prev) => ({ ...prev, [k]: value }));
 
   const submit = (e: FormEvent): void => {
     e.preventDefault();
+    if (saving) return;
     const url = form.url.trim();
     if (form.mode === 'custom' && url) {
       try {
@@ -386,13 +388,18 @@ function SettingsPanel({ settings, onSave, onCancel, onReset, onResetDemo }: Set
         return;
       }
     }
-    onSave({
-      ...form,
-      url,
-      token: form.token.trim(),
-      appId: form.mode === 'demo' ? DEMO_APP_ID : (form.appId.trim() || 'todo-notes'),
-      intervalSec: Math.max(10, Number(form.intervalSec) || 10),
-    });
+    setSaving(true);
+    Promise.resolve()
+      .then(() =>
+        onSave({
+          ...form,
+          url,
+          token: form.token.trim(),
+          appId: form.mode === 'demo' ? DEMO_APP_ID : (form.appId.trim() || 'todo-notes'),
+          intervalSec: Math.max(10, Number(form.intervalSec) || 10),
+        }),
+      )
+      .finally(() => setSaving(false));
   };
 
   return (
@@ -468,8 +475,8 @@ function SettingsPanel({ settings, onSave, onCancel, onReset, onResetDemo }: Set
         </div>
         <div className="modal-actions">
           <span className="spacer" />
-          <button type="button" className="btn ghost" onClick={onCancel}>{t('btn.cancel')}</button>
-          <button type="submit" form="settings-form" className="btn primary">{t('btn.saveConnect')}</button>
+          <button type="button" className="btn ghost" onClick={onCancel} disabled={saving}>{t('btn.cancel')}</button>
+          <button type="submit" form="settings-form" className="btn primary" disabled={saving}>{t('btn.saveConnect')}</button>
         </div>
       </div>
     </div>
@@ -736,16 +743,21 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
     setSettings(s);
     setSettingsOpen(false);
     try {
-      const e = await configureEngine(s, getAdapter());
-      onEngineChange(e);
-      if (isConfigured()) {
-        toast(s.mode === 'demo' ? t('toast.switchedDemo') : t('toast.configSaved'), 'success');
-        const stats = await e.sync();
+const e = await configureEngine(s, getAdapter());
+    onEngineChange(e);
+    if (isConfigured()) {
+      toast(s.mode === 'demo' ? t('toast.switchedDemo') : t('toast.configSaved'), 'success');
+      // Sync the *current* engine: a concurrent reconfigure may have replaced
+      // `e` already, and syncing a disposed engine would fail with "engine is closed".
+      const cur = getEngine();
+      if (cur) {
+        const stats = await cur.sync();
         refresh();
         toast(t('toast.syncDone', { up: stats.pushedOps, down: stats.appliedOps }), 'success');
-      } else {
-        toast(t('toast.switchedLocal'), 'success');
       }
+    } else {
+      toast(t('toast.switchedLocal'), 'success');
+    }
     } catch (err) {
       toast(t('toast.configFailed', { msg: errorMessage(err) }), 'error');
     }
@@ -1000,7 +1012,7 @@ function Workspace({ onEngineChange }: { onEngineChange: (e: SyncEngine) => void
       {settingsOpen && (
         <SettingsPanel
           settings={settings}
-          onSave={(s) => void handleSaveSettings(s)}
+          onSave={handleSaveSettings}
           onCancel={() => setSettingsOpen(false)}
           onReset={() => void handleReset()}
           onResetDemo={() => void handleResetDemo()}

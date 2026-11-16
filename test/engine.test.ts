@@ -214,4 +214,15 @@ describe('engine / end-to-end bidirectional sync', () => {
     await a.engine.close();
     await b.engine.close();
   });
+
+  it('close() is idempotent and subsequent sync fails loudly', async () => {
+    const backend = new MemoryBackend();
+    const a = await makeDevice(backend, 'A');
+    await todo(a, 't', 'x');
+    await a.engine.sync();
+    await a.engine.close();
+    await a.engine.close(); // idempotent: must not throw
+    await assert.rejects(async () => { await a.engine.sync(); }, /sqlite-remote-sync: engine is closed/);
+    await assert.rejects(async () => { await a.engine.push(); }, /sqlite-remote-sync: engine is closed/);
+  });
 });

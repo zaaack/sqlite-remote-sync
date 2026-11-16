@@ -9,6 +9,9 @@ const SETTINGS_KEY = 'srs.settings';
 
 let engine: SyncEngine | null = null;
 let configured = false;
+// In-flight (re)configuration. Concurrent `configureEngine` calls share one
+// promise so a second save never closes the engine a first save is using.
+let configPromise: Promise<SyncEngine> | null = null;
 
 export function loadSettings(): Settings {
   try {
@@ -62,39 +65,45 @@ function makeBackend(s: Settings) {
  * SQLite file, so a fresh engine picks up pending local changes on the next
  * sync.
  */
-export async function configureEngine(settings: Settings, db: SqliteAdapter): Promise<SyncEngine> {
-  if (engine) {
-    try {
-      await engine.close();
-    } catch (e) {
-      console.warn('close previous engine:', e);
+export function configureEngine(settings: Settings, db: SqliteAdapter): Promise<SyncEngine> {
+  if (configPromise) return configPromise;
+  configPromise = (async () => {
+    if (engine) {
+      try {
+        await engine.close();
+      } catch (e) {
+        console.warn('close previous engine:', e);
+      }
+      engine = null;
     }
-    engine = null;
-  }
 
-  const backend = makeBackend(settings);
-  configured = settings.mode === 'demo' || (settings.mode === 'custom' && !!settings.url.trim());
+    const backend = makeBackend(settings);
+    configured = settings.mode === 'demo' || (settings.mode === 'custom' && !!settings.url.trim());
 
-  const e = createSyncEngine({
-    db,
-    backend,
-    // All demo tabs must use the same namespace to see each other.
-    appId: settings.mode === 'demo' ? DEMO_APP_ID : (settings.appId || 'todo-notes').trim(),
-    siteId: getSiteId(),
-    tables: [{ name: 'items', primaryKey: ['id'] }],
-    strategy: 'field', // per-column LWW: edit title on one device, tick done on another, keep both
-    compress: true,
-    retry: { attempts: 3, baseDelayMs: 200, maxDelayMs: 3000 },
+    const e = createSyncEngine({
+      db,
+      backend,
+      // All demo tabs must use the same namespace to see each other.
+      appId: settings.mode === 'demo' ? DEMO_APP_ID : (settings.appId || 'todo-notes').trim(),
+      siteId: getSiteId(),
+      tables: [{ name: 'items', primaryKey: ['id'] }],
+      strategy: 'field', // per-column LWW: edit title on one device, tick done on another, keep both
+      compress: true,
+      retry: { attempts: 3, baseDelayMs: 200, maxDelayMs: 3000 },
+    });
+
+    await e.init();
+    engine = e;
+
+    // Demo mode also gets instant cross-tab refresh from the worker broadcast;
+    // this short timer is a safety net (and covers a tab that missed a message).
+    const intervalSec = settings.mode === 'demo' ? 10 : Math.max(10, Number(settings.intervalSec) || 60);
+    if (configured && settings.autoSync) e.startAutoSync(intervalSec * 1000);
+    return e;
+  })().finally(() => {
+    configPromise = null;
   });
-
-  await e.init();
-  engine = e;
-
-  // Demo mode also gets instant cross-tab refresh from the worker broadcast;
-  // this short timer is a safety net (and covers a tab that missed a message).
-  const intervalSec = settings.mode === 'demo' ? 10 : Math.max(10, Number(settings.intervalSec) || 60);
-  if (configured && settings.autoSync) e.startAutoSync(intervalSec * 1000);
-  return e;
+  return configPromise;
 }
 
 export function getEngine(): SyncEngine | null {
