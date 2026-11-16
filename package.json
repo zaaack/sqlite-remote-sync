@@ -1,6 +1,6 @@
 {
   "name": "sqlite-remote-sync",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Bidirectional, conflict-free SQLite sync over WebDAV / HTTP object storage, for kysely-sqlite-tools, web, React Native, Capacitor, Electron, Tauri and Node.",
   "type": "module",
   "sideEffects": false,
